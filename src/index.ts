@@ -1,5 +1,9 @@
 export { SalaryCalculator } from "./components/SalaryCalculator";
-export type { SalaryCalculatorProps, CalculationMode } from "./components/SalaryCalculator";
+export type {
+  SalaryCalculatorAppearance,
+  SalaryCalculatorProps,
+  CalculationMode,
+} from "./components/SalaryCalculator";
 export {
   BRACKETS_2026,
   PERSONAL_ALLOWANCE_ANNUAL_2026_RESIDENT,
@@ -19,4 +23,3 @@ export type { PayrollResult } from "./lib/salary-calculator";
 export { DEFAULT_EXCHANGE_RATE_ENDPOINT, fetchUsdToEgpRate } from "./lib/exchange-rate";
 export { salaryCalculatorStrings } from "./lib/strings";
 export type { SalaryCalculatorStrings } from "./lib/strings";
-

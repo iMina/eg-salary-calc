@@ -1,3 +1,5 @@
+"use client";
+
 import { SalaryCalculator } from "../components/SalaryCalculator";
 
 export default function Home() {
