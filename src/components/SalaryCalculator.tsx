@@ -20,20 +20,23 @@ import {
   salaryCalculatorStrings,
   type SalaryCalculatorStrings,
 } from "../lib/strings";
-import { 
-  Calculator, 
-  ArrowRightLeft, 
-  RefreshCcw, 
-  DollarSign, 
+import {
+  Calculator,
+  ArrowRightLeft,
+  RefreshCcw,
+  DollarSign,
   Info,
   Banknote,
   PiggyBank,
   TrendingUp,
   CreditCard,
-  Building
+  Building,
+  CalendarDays,
+  CalendarRange,
 } from "lucide-react";
 
 export type CalculationMode = "gross-to-net" | "net-to-gross";
+export type SalaryPeriod = "monthly" | "annual";
 export type SalaryCalculatorAppearance = "standalone" | "embedded";
 
 export interface SalaryCalculatorProps {
@@ -55,6 +58,7 @@ export function SalaryCalculator({
   const [exchangeRate, setExchangeRate] = useState(0);
   const [customRateInput, setCustomRateInput] = useState("");
   const [result, setResult] = useState<PayrollResult | null>(null);
+  const [salaryPeriod, setSalaryPeriod] = useState<SalaryPeriod>("monthly");
   const [isLoadingRate, setIsLoadingRate] = useState(true);
   const [fetchedRate, setFetchedRate] = useState<ExchangeRateSnapshot | null>(null);
 
@@ -88,13 +92,14 @@ export function SalaryCalculator({
       return;
     }
 
+    const effectiveAmount = salaryPeriod === "annual" ? numericAmount / 12 : numericAmount;
     const rateToUse = exchangeRate || fetchedRate?.rate || getUsdToEgpRate();
 
     try {
       if (mode === "gross-to-net") {
-        setResult(netFromGross2026(numericAmount, currency, rateToUse));
+        setResult(netFromGross2026(effectiveAmount, currency, rateToUse));
       } else {
-        setResult(grossFromNet2026(numericAmount, currency, rateToUse));
+        setResult(grossFromNet2026(effectiveAmount, currency, rateToUse));
       }
     } catch {
       setResult(null);
@@ -124,7 +129,7 @@ export function SalaryCalculator({
   useEffect(() => {
     performCalculation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, amount, currency, exchangeRate, fetchedRate?.rate]);
+  }, [mode, amount, currency, exchangeRate, fetchedRate?.rate, salaryPeriod]);
 
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -276,9 +281,51 @@ export function SalaryCalculator({
                   </div>
                 </div>
 
+                <div>
+                  <label className={labelClass}>
+                    {strings.salaryPeriod}
+                  </label>
+                  <div className="grid grid-cols-2 gap-3 p-1 bg-secondary/50 rounded-xl relative z-10">
+                    <button
+                      type="button"
+                      onClick={() => setSalaryPeriod("monthly")}
+                      className={`relative flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${
+                        salaryPeriod === "monthly" ? "text-primary-foreground shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                      }`}
+                    >
+                      {salaryPeriod === "monthly" && (
+                        <motion.div
+                          layoutId="period-bg"
+                          className="absolute inset-0 bg-primary rounded-lg -z-10 shadow-primary/30 shadow-lg"
+                        />
+                      )}
+                      <CalendarDays size={16} />
+                      {strings.monthly}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSalaryPeriod("annual")}
+                      className={`relative flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${
+                        salaryPeriod === "annual" ? "text-primary-foreground shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                      }`}
+                    >
+                      {salaryPeriod === "annual" && (
+                        <motion.div
+                          layoutId="period-bg"
+                          className="absolute inset-0 bg-primary rounded-lg -z-10 shadow-primary/30 shadow-lg"
+                        />
+                      )}
+                      <CalendarRange size={16} />
+                      {strings.annual}
+                    </button>
+                  </div>
+                </div>
+
                 <div className="group">
                   <label className={fieldLabelClass}>
-                    {mode === "gross-to-net" ? strings.monthlyGrossSalary : strings.targetMonthlyNetSalary}
+                    {salaryPeriod === "monthly"
+                      ? (mode === "gross-to-net" ? strings.monthlyGrossSalary : strings.targetMonthlyNetSalary)
+                      : (mode === "gross-to-net" ? strings.annualGrossSalary : strings.targetAnnualNetSalary)}
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors">
