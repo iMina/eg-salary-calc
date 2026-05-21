@@ -47,7 +47,9 @@ export const BRACKETS_2026 = [
 ] as const;
 
 export const SI_RATE_EMP = 0.11;
+// TODO: Verify against the latest Social Insurance Authority circular for 2026 — updated annually.
 export const SI_MIN_BASE_MONTHLY_2026 = 2_700.0;
+// TODO: Verify against the latest Social Insurance Authority circular for 2026 — updated annually.
 export const SI_MAX_BASE_MONTHLY_2026 = 16_700.0;
 export const PERSONAL_ALLOWANCE_ANNUAL_2026_RESIDENT = 20_000.0;
 
