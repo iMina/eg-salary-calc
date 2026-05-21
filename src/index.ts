@@ -3,6 +3,7 @@ export type {
   SalaryCalculatorAppearance,
   SalaryCalculatorProps,
   CalculationMode,
+  SalaryPeriod,
 } from "./components/SalaryCalculator";
 export {
   BRACKETS_2026,

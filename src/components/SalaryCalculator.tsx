@@ -92,6 +92,7 @@ export function SalaryCalculator({
       return;
     }
 
+    // Both calculation functions operate on monthly figures; convert annual input to monthly equivalent.
     const effectiveAmount = salaryPeriod === "annual" ? numericAmount / 12 : numericAmount;
     const rateToUse = exchangeRate || fetchedRate?.rate || getUsdToEgpRate();
 
@@ -508,7 +509,7 @@ export function SalaryCalculator({
                       <div className="relative z-10 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                         <div>
                           <p className={takeHomeLabelClass}>
-                            {strings.takeHomePay}
+                            {salaryPeriod === "annual" ? `${strings.monthly} ${strings.takeHomePay}` : strings.takeHomePay}
                           </p>
                           <div className={takeHomeMainClass}>
                             {formatCurrency(result.monthlyTakeHome, "EGP")}
