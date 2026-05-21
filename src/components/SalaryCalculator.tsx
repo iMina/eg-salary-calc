@@ -288,7 +288,7 @@ export function SalaryCalculator({
                   <div className="grid grid-cols-2 gap-3 p-1 bg-secondary/50 rounded-xl relative z-10">
                     <button
                       type="button"
-                      onClick={() => setSalaryPeriod("monthly")}
+                      onClick={() => { setSalaryPeriod("monthly"); setAmount(""); }}
                       className={`relative flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${
                         salaryPeriod === "monthly" ? "text-primary-foreground shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                       }`}
@@ -304,7 +304,7 @@ export function SalaryCalculator({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setSalaryPeriod("annual")}
+                      onClick={() => { setSalaryPeriod("annual"); setAmount(""); }}
                       className={`relative flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${
                         salaryPeriod === "annual" ? "text-primary-foreground shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                       }`}
