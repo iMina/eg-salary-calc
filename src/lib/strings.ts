@@ -34,6 +34,11 @@ export const salaryCalculatorStrings = {
   includesAllowance: "Includes personal allowance deduction for residents (EGP 20,000 annually)",
   siCalculation: "Social insurance is calculated on gross salary with minimum and maximum caps",
   invalidAmount: "Please enter a valid amount",
+  salaryPeriod: "Salary Period",
+  monthly: "Monthly",
+  annual: "Annual",
+  annualGrossSalary: "Annual Gross Salary",
+  targetAnnualNetSalary: "Target Annual Net Salary",
 } as const;
 
 export type SalaryCalculatorStrings = typeof salaryCalculatorStrings;
