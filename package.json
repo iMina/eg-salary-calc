@@ -1,6 +1,7 @@
 {
   "name": "eg-salary-calc",
   "version": "0.1.0",
+  "type": "module",
   "private": false,
   "description": "Standalone Egyptian salary calculator built with Next.js.",
   "main": "./src/index.ts",
@@ -13,7 +14,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test test/*.test.ts"
   },
   "dependencies": {
     "framer-motion": "^12.38.0",

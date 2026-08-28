@@ -52,17 +52,69 @@ export const SI_MIN_BASE_MONTHLY_2026 = 2_700.0;
 // TODO: Verify against the latest Social Insurance Authority circular for 2026 — updated annually.
 export const SI_MAX_BASE_MONTHLY_2026 = 16_700.0;
 export const PERSONAL_ALLOWANCE_ANNUAL_2026_RESIDENT = 20_000.0;
+export const MARTYRS_FUND_RATE = 0.0005;
+export const DEFAULT_CURRENCY = "EGP" as const;
 
 export function clamp(value: number, lower: number, upper: number): number {
   return Math.max(lower, Math.min(upper, value));
 }
 
 export function annualIncomeTax(annualTaxable: number): number {
+  const taxable = Math.floor(Math.max(annualTaxable, 0.0) / 10) * 10;
+
+  if (taxable <= 600_000) {
+    return taxAcrossBands(taxable, BRACKETS_2026);
+  }
+
+  if (taxable <= 700_000) {
+    return taxAcrossBands(taxable, [
+      { upper: 55_000, rate: 0.1 },
+      { upper: 70_000, rate: 0.15 },
+      { upper: 200_000, rate: 0.2 },
+      { upper: 400_000, rate: 0.225 },
+      { upper: Infinity, rate: 0.25 },
+    ]);
+  }
+
+  if (taxable <= 800_000) {
+    return taxAcrossBands(taxable, [
+      { upper: 70_000, rate: 0.15 },
+      { upper: 200_000, rate: 0.2 },
+      { upper: 400_000, rate: 0.225 },
+      { upper: Infinity, rate: 0.25 },
+    ]);
+  }
+
+  if (taxable <= 900_000) {
+    return taxAcrossBands(taxable, [
+      { upper: 200_000, rate: 0.2 },
+      { upper: 400_000, rate: 0.225 },
+      { upper: Infinity, rate: 0.25 },
+    ]);
+  }
+
+  if (taxable <= 1_200_000) {
+    return taxAcrossBands(taxable, [
+      { upper: 400_000, rate: 0.225 },
+      { upper: Infinity, rate: 0.25 },
+    ]);
+  }
+
+  return taxAcrossBands(taxable, [
+    { upper: 1_200_000, rate: 0.25 },
+    { upper: Infinity, rate: 0.275 },
+  ]);
+}
+
+function taxAcrossBands(
+  annualTaxable: number,
+  brackets: ReadonlyArray<{ upper: number; rate: number }>
+): number {
   let tax = 0.0;
   let lower = 0.0;
   let remaining = annualTaxable;
 
-  for (const bracket of BRACKETS_2026) {
+  for (const bracket of brackets) {
     const bandSize = Math.min(remaining, bracket.upper - lower);
 
     if (bandSize > 0) {
@@ -71,9 +123,7 @@ export function annualIncomeTax(annualTaxable: number): number {
       lower = bracket.upper;
     }
 
-    if (remaining <= 0) {
-      break;
-    }
+    if (remaining <= 0) break;
   }
 
   return Math.max(tax, 0.0);
@@ -83,12 +133,14 @@ export interface PayrollResult {
   monthlyGross: number;
   monthlyEmployeeSi: number;
   monthlyIncomeTax: number;
+  monthlyMartyrsFund: number;
   monthlyTakeHome: number;
   annualTaxableIncome: number;
   annualIncomeTax: number;
   monthlyGrossUsd?: number;
   monthlyEmployeeSiUsd?: number;
   monthlyIncomeTaxUsd?: number;
+  monthlyMartyrsFundUsd?: number;
   monthlyTakeHomeUsd?: number;
   annualTaxableIncomeUsd?: number;
   annualIncomeTaxUsd?: number;
@@ -98,14 +150,19 @@ export function netFromGross2026(
   monthlyBaseSalary: number,
   currency: "EGP" | "USD" = "EGP",
   exchangeRate?: number,
-  resident = true
+  resident = true,
+  employeeSiMonthlyOverride?: number
 ): PayrollResult {
   const rate = exchangeRate ?? getUsdToEgpRate();
   const monthlyGrossEgp =
     currency === "USD" ? convertCurrency(monthlyBaseSalary, "USD", "EGP", rate) : monthlyBaseSalary;
 
   const siBaseMonthly = clamp(monthlyGrossEgp, SI_MIN_BASE_MONTHLY_2026, SI_MAX_BASE_MONTHLY_2026);
-  const employeeSiMonthly = SI_RATE_EMP * siBaseMonthly;
+  const calculatedEmployeeSiMonthly = SI_RATE_EMP * siBaseMonthly;
+  const employeeSiMonthly =
+    employeeSiMonthlyOverride === undefined
+      ? calculatedEmployeeSiMonthly
+      : Math.max(employeeSiMonthlyOverride, 0.0);
 
   const annualGross = monthlyGrossEgp * 12.0;
   const annualSi = employeeSiMonthly * 12.0;
@@ -113,11 +170,14 @@ export function netFromGross2026(
   const annualTaxable = Math.max(annualGross - annualSi - personalAllowance, 0.0);
   const incomeTaxAnnual = annualIncomeTax(annualTaxable);
   const incomeTaxMonthly = incomeTaxAnnual / 12.0;
-  const takeHomeMonthly = monthlyGrossEgp - employeeSiMonthly - incomeTaxMonthly;
+  const martyrsFundMonthly = monthlyGrossEgp * MARTYRS_FUND_RATE;
+  const takeHomeMonthly =
+    monthlyGrossEgp - employeeSiMonthly - incomeTaxMonthly - martyrsFundMonthly;
 
   const monthlyGrossUsd = currency === "USD" ? monthlyBaseSalary : monthlyGrossEgp / rate;
   const monthlyEmployeeSiUsd = employeeSiMonthly / rate;
   const monthlyIncomeTaxUsd = incomeTaxMonthly / rate;
+  const monthlyMartyrsFundUsd = martyrsFundMonthly / rate;
   const monthlyTakeHomeUsd = takeHomeMonthly / rate;
   const annualTaxableIncomeUsd = annualTaxable / rate;
   const annualIncomeTaxUsd = incomeTaxAnnual / rate;
@@ -126,16 +186,29 @@ export function netFromGross2026(
     monthlyGross: Math.round(monthlyGrossEgp * 100) / 100,
     monthlyEmployeeSi: Math.round(employeeSiMonthly * 100) / 100,
     monthlyIncomeTax: Math.round(incomeTaxMonthly * 100) / 100,
+    monthlyMartyrsFund: Math.round(martyrsFundMonthly * 100) / 100,
     monthlyTakeHome: Math.round(takeHomeMonthly * 100) / 100,
     annualTaxableIncome: Math.round(annualTaxable * 100) / 100,
     annualIncomeTax: Math.round(incomeTaxAnnual * 100) / 100,
     monthlyGrossUsd: Math.round(monthlyGrossUsd * 100) / 100,
     monthlyEmployeeSiUsd: Math.round(monthlyEmployeeSiUsd * 100) / 100,
     monthlyIncomeTaxUsd: Math.round(monthlyIncomeTaxUsd * 100) / 100,
+    monthlyMartyrsFundUsd: Math.round(monthlyMartyrsFundUsd * 100) / 100,
     monthlyTakeHomeUsd: Math.round(monthlyTakeHomeUsd * 100) / 100,
     annualTaxableIncomeUsd: Math.round(annualTaxableIncomeUsd * 100) / 100,
     annualIncomeTaxUsd: Math.round(annualIncomeTaxUsd * 100) / 100,
   };
+}
+
+export type CalculationDirection = "gross-to-net" | "net-to-gross";
+
+export function getPrimaryResult(
+  mode: CalculationDirection,
+  result: PayrollResult
+): { kind: "take-home" | "gross"; monthlyEgp: number } {
+  return mode === "gross-to-net"
+    ? { kind: "take-home", monthlyEgp: result.monthlyTakeHome }
+    : { kind: "gross", monthlyEgp: result.monthlyGross };
 }
 
 export function grossFromNet2026(
@@ -143,30 +216,47 @@ export function grossFromNet2026(
   currency: "EGP" | "USD" = "EGP",
   exchangeRate?: number,
   tolerance = 0.01,
-  maxIterations = 200
+  maxIterations = 200,
+  employeeSiMonthlyOverride?: number
 ): PayrollResult {
   const rate = exchangeRate ?? getUsdToEgpRate();
   const targetEgp =
     currency === "USD" ? convertCurrency(targetMonthlyNet, "USD", "EGP", rate) : targetMonthlyNet;
 
-  const netAtZeroGross = netFromGross2026(0.0, "EGP", rate).monthlyTakeHome;
+  const netAtZeroGross = netFromGross2026(
+    0.0,
+    "EGP",
+    rate,
+    true,
+    employeeSiMonthlyOverride
+  ).monthlyTakeHome;
   if (targetEgp <= netAtZeroGross) {
-    return netFromGross2026(0.0, "EGP", rate);
+    return netFromGross2026(0.0, "EGP", rate, true, employeeSiMonthlyOverride);
   }
 
   let lower = 0.0;
   let upper = Math.max(targetEgp + 20_000.0, 20_000.0);
 
-  while (netFromGross2026(upper, "EGP", rate).monthlyTakeHome < targetEgp && upper < 100_000_000.0) {
+  while (
+    netFromGross2026(upper, "EGP", rate, true, employeeSiMonthlyOverride).monthlyTakeHome <
+      targetEgp &&
+    upper < 100_000_000.0
+  ) {
     upper *= 2.0;
   }
 
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
     const midpoint = 0.5 * (lower + upper);
-    const netAtMidpoint = netFromGross2026(midpoint, "EGP", rate).monthlyTakeHome;
+    const netAtMidpoint = netFromGross2026(
+      midpoint,
+      "EGP",
+      rate,
+      true,
+      employeeSiMonthlyOverride
+    ).monthlyTakeHome;
 
     if (Math.abs(netAtMidpoint - targetEgp) <= tolerance) {
-      return netFromGross2026(midpoint, "EGP", rate);
+      return netFromGross2026(midpoint, "EGP", rate, true, employeeSiMonthlyOverride);
     }
 
     if (netAtMidpoint < targetEgp) {
@@ -176,7 +266,13 @@ export function grossFromNet2026(
     }
   }
 
-  return netFromGross2026(0.5 * (lower + upper), "EGP", rate);
+  return netFromGross2026(
+    0.5 * (lower + upper),
+    "EGP",
+    rate,
+    true,
+    employeeSiMonthlyOverride
+  );
 }
 
 export function formatCurrency(amount: number, currency: "EGP" | "USD"): string {
@@ -185,4 +281,3 @@ export function formatCurrency(amount: number, currency: "EGP" | "USD"): string 
     maximumFractionDigits: 2,
   })} ${currency}`;
 }
-

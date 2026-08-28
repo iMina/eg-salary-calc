@@ -24,7 +24,10 @@ export const salaryCalculatorStrings = {
   grossSalary: "Gross Salary:",
   employeeSi: "Employee SI:",
   incomeTax: "Income Tax:",
+  martyrsFund: "Martyrs Fund:",
   takeHomePay: "Take Home Pay:",
+  calculatedGrossSalary: "Calculated Gross Salary:",
+  resetToCalculatedSi: "Reset to calculated SI",
   annualSummary: "Annual Summary",
   taxableIncome: "Taxable Income:",
   enterDetails: "Enter your details and click \"Calculate\" to see results",
@@ -42,4 +45,3 @@ export const salaryCalculatorStrings = {
 } as const;
 
 export type SalaryCalculatorStrings = typeof salaryCalculatorStrings;
-

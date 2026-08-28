@@ -9,7 +9,9 @@ import {
   fetchUsdToEgpRate,
 } from "../lib/exchange-rate";
 import {
+  DEFAULT_CURRENCY,
   formatCurrency,
+  getPrimaryResult,
   getUsdToEgpRate,
   grossFromNet2026,
   netFromGross2026,
@@ -54,10 +56,11 @@ export function SalaryCalculator({
 }: SalaryCalculatorProps) {
   const [mode, setMode] = useState<CalculationMode>("gross-to-net");
   const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState<"EGP" | "USD">("USD");
+  const [currency, setCurrency] = useState<"EGP" | "USD">(DEFAULT_CURRENCY);
   const [exchangeRate, setExchangeRate] = useState(0);
   const [customRateInput, setCustomRateInput] = useState("");
   const [result, setResult] = useState<PayrollResult | null>(null);
+  const [employeeSiOverrideInput, setEmployeeSiOverrideInput] = useState<string | null>(null);
   const [salaryPeriod, setSalaryPeriod] = useState<SalaryPeriod>("monthly");
   const [isLoadingRate, setIsLoadingRate] = useState(true);
   const [fetchedRate, setFetchedRate] = useState<ExchangeRateSnapshot | null>(null);
@@ -95,12 +98,22 @@ export function SalaryCalculator({
     // Both calculation functions operate on monthly figures; convert annual input to monthly equivalent.
     const effectiveAmount = salaryPeriod === "annual" ? numericAmount / 12 : numericAmount;
     const rateToUse = exchangeRate || fetchedRate?.rate || getUsdToEgpRate();
+    const parsedEmployeeSiOverride =
+      employeeSiOverrideInput === null ? undefined : Number.parseFloat(employeeSiOverrideInput);
+    const employeeSiOverride =
+      parsedEmployeeSiOverride !== undefined &&
+      Number.isFinite(parsedEmployeeSiOverride) &&
+      parsedEmployeeSiOverride >= 0
+        ? parsedEmployeeSiOverride
+        : undefined;
 
     try {
       if (mode === "gross-to-net") {
-        setResult(netFromGross2026(effectiveAmount, currency, rateToUse));
+        setResult(netFromGross2026(effectiveAmount, currency, rateToUse, true, employeeSiOverride));
       } else {
-        setResult(grossFromNet2026(effectiveAmount, currency, rateToUse));
+        setResult(
+          grossFromNet2026(effectiveAmount, currency, rateToUse, 0.01, 200, employeeSiOverride)
+        );
       }
     } catch {
       setResult(null);
@@ -130,7 +143,15 @@ export function SalaryCalculator({
   useEffect(() => {
     performCalculation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, amount, currency, exchangeRate, fetchedRate?.rate, salaryPeriod]);
+  }, [
+    mode,
+    amount,
+    currency,
+    exchangeRate,
+    fetchedRate?.rate,
+    salaryPeriod,
+    employeeSiOverrideInput,
+  ]);
 
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -199,6 +220,9 @@ export function SalaryCalculator({
   const takeHomeUsdClass = isEmbedded
     ? "self-start rounded-xl border border-primary/20 bg-primary/12 px-4 py-2 text-xl font-semibold text-foreground sm:self-auto"
     : "text-primary-foreground/90 font-semibold text-xl bg-black/10 px-4 py-2 rounded-xl backdrop-blur-sm shadow-inner self-start sm:self-auto";
+  const primaryResult = result ? getPrimaryResult(mode, result) : null;
+  const primaryResultUsd =
+    mode === "gross-to-net" ? result?.monthlyTakeHomeUsd : result?.monthlyGrossUsd;
 
   return (
     <div className={shellClass}>
@@ -469,15 +493,24 @@ export function SalaryCalculator({
                             usd={result.monthlyGrossUsd} 
                             egp={result.monthlyGross} 
                           />
-                          <ResultRow 
+                          <EditableEmployeeSiRow
                             label={strings.employeeSi} 
                             usd={result.monthlyEmployeeSiUsd} 
                             egp={result.monthlyEmployeeSi} 
+                            overrideInput={employeeSiOverrideInput}
+                            onOverrideInputChange={setEmployeeSiOverrideInput}
+                            onReset={() => setEmployeeSiOverrideInput(null)}
+                            resetLabel={strings.resetToCalculatedSi}
                           />
                           <ResultRow 
                             label={strings.incomeTax} 
                             usd={result.monthlyIncomeTaxUsd} 
                             egp={result.monthlyIncomeTax} 
+                          />
+                          <ResultRow
+                            label={strings.martyrsFund}
+                            usd={result.monthlyMartyrsFundUsd}
+                            egp={result.monthlyMartyrsFund}
                           />
                         </div>
                       </div>
@@ -509,14 +542,20 @@ export function SalaryCalculator({
                       <div className="relative z-10 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                         <div>
                           <p className={takeHomeLabelClass}>
-                            {salaryPeriod === "annual" ? `${strings.monthly} ${strings.takeHomePay}` : strings.takeHomePay}
+                            {mode === "gross-to-net"
+                              ? salaryPeriod === "annual"
+                                ? `${strings.monthly} ${strings.takeHomePay}`
+                                : strings.takeHomePay
+                              : salaryPeriod === "annual"
+                                ? `${strings.monthly} ${strings.calculatedGrossSalary}`
+                                : strings.calculatedGrossSalary}
                           </p>
                           <div className={takeHomeMainClass}>
-                            {formatCurrency(result.monthlyTakeHome, "EGP")}
+                            {formatCurrency(primaryResult?.monthlyEgp || 0, "EGP")}
                           </div>
                         </div>
                         <div className={takeHomeUsdClass}>
-                          {formatCurrency(result.monthlyTakeHomeUsd || 0, "USD")}
+                          {formatCurrency(primaryResultUsd || 0, "USD")}
                         </div>
                       </div>
                     </div>
@@ -570,6 +609,63 @@ function ResultRow({ label, usd, egp }: { label: string, usd?: number, egp: numb
       </div>
       <div className="font-semibold tabular-nums w-1/3 text-right">
         {formatCurrency(egp, "EGP")}
+      </div>
+    </div>
+  );
+}
+
+function EditableEmployeeSiRow({
+  label,
+  usd,
+  egp,
+  overrideInput,
+  onOverrideInputChange,
+  onReset,
+  resetLabel,
+}: {
+  label: string;
+  usd?: number;
+  egp: number;
+  overrideInput: string | null;
+  onOverrideInputChange: (value: string | null) => void;
+  onReset: () => void;
+  resetLabel: string;
+}) {
+  const isManual = overrideInput !== null;
+
+  return (
+    <div className="grid grid-cols-2 items-center gap-x-3 gap-y-2 border-b border-border/30 pb-3 text-sm last:border-0 last:pb-0 sm:flex sm:justify-between sm:text-base">
+      <div className="font-medium text-muted-foreground sm:w-1/3">{label}</div>
+      <div className="text-right font-semibold tabular-nums text-foreground/80 sm:w-1/3">
+        {formatCurrency(usd || 0, "USD")}
+      </div>
+      <div className="col-span-2 flex items-center justify-end gap-2 sm:w-1/3">
+        <input
+          aria-label={`${label} EGP`}
+          type="number"
+          min="0"
+          step="0.01"
+          value={isManual ? overrideInput : egp.toFixed(2)}
+          onChange={(event) => onOverrideInputChange(event.target.value)}
+          onBlur={() => {
+            if (overrideInput !== null && overrideInput.trim() === "") onOverrideInputChange(null);
+          }}
+          className={`w-28 rounded-md border bg-background/60 px-2 py-1 text-right font-semibold tabular-nums outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20 ${
+            isManual ? "border-primary/60" : "border-border/40"
+          }`}
+        />
+        <span className="text-xs font-semibold text-muted-foreground">EGP</span>
+        {isManual && (
+          <button
+            type="button"
+            onClick={onReset}
+            aria-label={resetLabel}
+            title={resetLabel}
+            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+          >
+            <RefreshCcw size={14} />
+          </button>
+        )}
       </div>
     </div>
   );
